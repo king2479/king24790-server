@@ -1,0 +1,19 @@
+leases:
+  B1:
+    owner: b554b4f9-9b9b-304c-8d5b-91f51fad107d
+    name: king247
+    expiresAt: 1791732377986
+homes:
+  b554b4f9-9b9b-304c-8d5b-91f51fad107d:
+    world: world
+    x: 81.80212532687156
+    y: 82.0
+    z: 226.3308798816491
+    yaw: 237.74998
+    pitch: 8.250006
+clans:
+  banana:
+    name: banana
+    owner: b554b4f9-9b9b-304c-8d5b-91f51fad107d
+    members:
+      b554b4f9-9b9b-304c-8d5b-91f51fad107d: king247

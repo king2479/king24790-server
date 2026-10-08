@@ -1,5 +1,11 @@
 [
   {
+    "uuid": "b554b4f9-9b9b-304c-8d5b-91f51fad107d",
+    "name": "king247",
+    "level": 4,
+    "bypassesPlayerLimit": false
+  },
+  {
     "uuid": "febdbb10-b91d-3d00-9817-1ff489b34cde",
     "name": "Neonic",
     "level": 4,

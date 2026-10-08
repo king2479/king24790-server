@@ -10,9 +10,10 @@ listener_01:
   redirect_legacy_clients_to: 'null'
   server_icon: server-icon.png
   server_motd:
-  - '&6An EaglercraftX server'
+  - '&ehi my name is nana'
   allow_motd: true
   allow_query: true
+  allow_voice: true
   request_motd_cache:
     cache_ttl: 7200
     online_server_list_animation: false

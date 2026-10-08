@@ -1,1 +1,5 @@
 /backups/
+/server/plugins/AuthMe/authme.db
+/server/plugins/AuthMe/authme.db-shm
+/server/plugins/AuthMe/authme.db-wal
+/server/plugins/AuthMe/authme.log

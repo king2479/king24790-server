@@ -28,19 +28,32 @@ if command -v tmux >/dev/null 2>&1; then
   echo "set -g mouse on" > ~/.tmux.conf
   if tmux has-session -t server 2>/dev/null; then
     ensure_codespaces_port_public
-    exec tmux attach-session -t server
+    if [ "${KING24790_START_ATTACH:-1}" = "1" ]; then
+      exec tmux attach-session -t server
+    fi
+    printf 'Server is already running in tmux session "server".\n'
+    exit 0
   fi
   tmux kill-session -t placeholder 2>/dev/null || true
 fi
 
 BASEDIR="$SERVER_DIR"
+SERVER_JVM_FLAGS="-Xms2G -Xmx2G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1"
 
 FORCE1="nah"
+SKIP_EAGLERCRAFT_SOURCE_UPDATE=false
 
 export GIT_TERMINAL_PROMPT=0
 
 if [ ! -e "eaglercraftx/.git" ]; then
-  FORCE1="bruh"
+  if [ -s "web/index.html" ] && [ -s "web/bootstrap.js" ] &&
+    [ -s "web/js/classes.js" ] && [ -s "web/js/assets.epk" ] &&
+    jar tf "bungee/plugins/EaglercraftX_1.8_EaglerXVelocity.jar" >/dev/null 2>&1; then
+    SKIP_EAGLERCRAFT_SOURCE_UPDATE=true
+    printf 'Using existing Eaglercraft web and proxy files; source checkout is unavailable, so updates are skipped.\n'
+  else
+    FORCE1="bruh"
+  fi
 fi
 
 if ! grep -q "eula=true" "eula.txt"; then
@@ -77,8 +90,10 @@ rm -rf /tmp/teavm
 rm -rf /tmp/output
 
 mkdir -p bungee/plugins
-mkdir eaglercraftx
-mkdir web
+mkdir -p web
+
+if [ "$SKIP_EAGLERCRAFT_SOURCE_UPDATE" != true ]; then
+  mkdir -p eaglercraftx
 
 if [ "$FORCE1" != "bruh" ]; then
   if ! git -C eaglercraftx remote update; then
@@ -204,7 +219,8 @@ if [ -f "client_version" ] && [ -f "gateway_version" ]; then
   fi
 fi
 
-cd ..
+cd "$SERVER_DIR"
+fi
 
 # run it!!
 if ! jar tf bungee/bungee.jar >/dev/null 2>&1; then
@@ -230,7 +246,7 @@ if command -v tmux >/dev/null 2>&1; then
     cd ../cuberite
     tmux splitw -t server -v "BIND_ADDR=127.0.0.1 LD_PRELOAD=../bindmod.so ./Cuberite; tmux kill-session -t server"
   else
-    tmux splitw -t server -v "java -Djline.terminal=jline.UnsupportedTerminal -Xmx512M -jar server.jar nogui; tmux kill-session -t server"
+    tmux splitw -t server -v "java -Djline.terminal=jline.UnsupportedTerminal $SERVER_JVM_FLAGS -jar server.jar nogui; tmux kill-session -t server"
   fi
   cd ..
 else
@@ -239,7 +255,7 @@ else
   if [ ! -f "server/server.jar" ] && [ -d "cuberite" ]; then
     (cd cuberite && exec env BIND_ADDR=127.0.0.1 LD_PRELOAD=../bindmod.so ./Cuberite) &
   else
-    (cd server && exec java -Djline.terminal=jline.UnsupportedTerminal -Xmx512M -jar server.jar nogui) &
+    (cd server && exec java -Djline.terminal=jline.UnsupportedTerminal $SERVER_JVM_FLAGS -jar server.jar nogui) &
   fi
   BACKEND_PID=$!
   cleanup_server_processes() {
@@ -255,6 +271,10 @@ fi
 ensure_codespaces_port_public
 
 if command -v tmux >/dev/null 2>&1; then
+  if [ "${KING24790_START_ATTACH:-1}" != "1" ]; then
+    printf 'Server started in tmux session "server". Use ./start --attach for its console.\n'
+    exit 0
+  fi
   while tmux has-session -t server
   do
     tmux a -t server

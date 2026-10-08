@@ -21,3 +21,58 @@ commands:
   delwarp:
     description: Delete a public warp.
     usage: /delwarp <name>
+  cityspawn:
+    description: Build the Manhattan-style city spawn in the overworld.
+    usage: /cityspawn
+    permission: homeswarps.cityspawn
+    permission-message: You do not have permission to build the city spawn.
+  citylights:
+    description: Add safe, colorful night lighting to the Times Square towers.
+    usage: /citylights
+    permission: homeswarps.citylights
+    permission-message: You do not have permission to add city lights.
+  spawn:
+    description: Teleport to the city spawn.
+    usage: /spawn
+  subway:
+    description: Teleport to the city subway platform.
+    usage: /subway
+  sub:
+    description: Build a temporary subway station here and travel to spawn.
+    usage: /sub
+  psub:
+    description: Build your permanent home subway station or travel to a destination.
+    usage: /psub [build|home|clan|spawn|market]
+  apartments:
+    description: List available city apartments.
+    usage: /apartments
+  rent:
+    description: Rent a city apartment for iron ingots.
+    usage: /rent <A1|A2|B1|B2>
+  myapartment:
+    description: Teleport to your rented city apartment.
+    usage: /myapartment
+  clan:
+    description: Create and manage a clan and its home destination.
+    usage: /clan <create|invite|join|leave|info|sethome|disband>
+  shop:
+    description: Browse the city market and buy or sell items for emeralds.
+    usage: /shop [list] | /shop <buy|sell> <item> <amount>
+  market:
+    description: Teleport to the modern city market.
+    usage: /market
+  shopping:
+    description: Teleport to the city shopping district.
+    usage: /shopping
+  shoppingdistrict:
+    description: Build or rebuild the city shopping district.
+    usage: /shoppingdistrict
+    permission: homeswarps.cityspawn
+    permission-message: You do not have permission to build the shopping district.
+permissions:
+  homeswarps.cityspawn:
+    description: Build the custom city spawn.
+    default: op
+  homeswarps.citylights:
+    description: Add colorful lighting to the existing city spawn.
+    default: op

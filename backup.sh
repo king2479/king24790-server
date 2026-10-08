@@ -39,7 +39,9 @@ for path in \
   bungee/plugins/EaglercraftXBungee/settings.yml \
   bungee/plugins/eaglerxvelocity/authservice.yml \
   bungee/plugins/eaglerxvelocity/listeners.yml \
-  bungee/plugins/eaglerxvelocity/settings.yml; do
+  bungee/plugins/eaglerxvelocity/settings.yml \
+  server/plugins/AuthMe/authme.db \
+  server/plugins/AuthMe/config.yml; do
   if [[ -e "$SERVER_DIR/$path" ]]; then
     paths+=("$path")
   fi
