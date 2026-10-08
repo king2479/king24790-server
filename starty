@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SERVER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SERVER_DIR/codespaces-port.sh"
+
+if ! command -v tmux >/dev/null 2>&1; then
+  printf 'starty needs tmux to open separate proxy and server panes. Install it with: sudo apt-get update && sudo apt-get install -y tmux\n' >&2
+  exit 1
+fi
+
+if tmux has-session -t server 2>/dev/null; then
+  ensure_codespaces_port_public
+  exec tmux attach -t server
+fi
+
+if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q ':8081'; then
+  printf 'Port 8081 is already in use by a server not managed by tmux; refusing to start a duplicate.\n' >&2
+  exit 1
+fi
+
+exec "$SERVER_DIR/start"

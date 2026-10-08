@@ -5,23 +5,41 @@
 
 unset DISPLAY
 
-echo "set -g mouse on" > ~/.tmux.conf
+SERVER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SERVER_DIR/codespaces-port.sh"
+cd "$SERVER_DIR"
 
-tmux kill-session -t server
-tmux kill-session -t placeholder
+download_cached_file() {
+  local url="$1"
+  local target="$2"
+  local temporary="${target}.part.$$"
 
-BASEDIR="$PWD"
+  if [ -s "$target" ]; then
+    return 0
+  fi
+  if ! wget -O "$temporary" "$url" || [ ! -s "$temporary" ] || ! mv "$temporary" "$target"; then
+    rm -f "$temporary"
+    printf 'Could not download or validate %s. Check your network connection and try start again.\n' "$target" >&2
+    return 1
+  fi
+}
+
+if command -v tmux >/dev/null 2>&1; then
+  echo "set -g mouse on" > ~/.tmux.conf
+  if tmux has-session -t server 2>/dev/null; then
+    ensure_codespaces_port_public
+    exec tmux attach-session -t server
+  fi
+  tmux kill-session -t placeholder 2>/dev/null || true
+fi
+
+BASEDIR="$SERVER_DIR"
 
 FORCE1="nah"
 
-JAVA11="$(command -v javac)"
-JAVA11="${JAVA11%?}"
-
 export GIT_TERMINAL_PROMPT=0
 
-if [ ! -d "eaglercraftx" ]; then
-  rm client_version
-  rm gateway_version
+if [ ! -e "eaglercraftx/.git" ]; then
   FORCE1="bruh"
 fi
 
@@ -62,86 +80,195 @@ mkdir -p bungee/plugins
 mkdir eaglercraftx
 mkdir web
 
-cd eaglercraftx
-git remote update
-LOCALHASH=$(git rev-parse @{0})
-REMOTEHASH=$(git rev-parse @{u})
-if [ "$LOCALHASH" != "$REMOTEHASH" ] || [ $FORCE1 == "bruh" ]; then
-  cd ..
-  rm -rf eaglercraftx
-  git clone https://github.com/WINRARisyou/EaglercraftX eaglercraftx --depth 1
-  mkdir eaglercraftx
-  cd eaglercraftx
+if [ "$FORCE1" != "bruh" ]; then
+  if ! git -C eaglercraftx remote update; then
+    printf 'Cannot check for Eaglercraft updates. Check your network connection and try start again.\n' >&2
+    exit 1
+  fi
+  if ! LOCALHASH=$(git -C eaglercraftx rev-parse HEAD) ||
+    ! REMOTEHASH=$(git -C eaglercraftx rev-parse '@{u}'); then
+    printf 'Cannot determine the Eaglercraft checkout version or upstream branch. Check eaglercraftx/ and try start again.\n' >&2
+    exit 1
+  fi
+else
+  LOCALHASH=''
+  REMOTEHASH=''
+fi
+
+if [ "$LOCALHASH" != "$REMOTEHASH" ] || [ "$FORCE1" = "bruh" ]; then
+  if ! CLONE_STAGE="$(mktemp -d "$SERVER_DIR/.eaglercraftx-clone.XXXXXX")"; then
+    printf 'Could not create a temporary directory for the Eaglercraft update.\n' >&2
+    exit 1
+  fi
+  if ! git clone https://github.com/WINRARisyou/EaglercraftX "$CLONE_STAGE/source" --depth 1; then
+    rm -rf "$CLONE_STAGE"
+    printf 'Could not download Eaglercraft sources. Check your network connection and try start again.\n' >&2
+    exit 1
+  fi
+  OLD_CHECKOUT="$SERVER_DIR/.eaglercraftx-old.$$"
+  if [ -e "$SERVER_DIR/eaglercraftx" ] && ! mv "$SERVER_DIR/eaglercraftx" "$OLD_CHECKOUT"; then
+    rm -rf "$CLONE_STAGE"
+    printf 'Could not stage the existing Eaglercraft checkout for update.\n' >&2
+    exit 1
+  fi
+  if ! mv "$CLONE_STAGE/source" "$SERVER_DIR/eaglercraftx"; then
+    if [ -e "$OLD_CHECKOUT" ]; then
+      if ! mv "$OLD_CHECKOUT" "$SERVER_DIR/eaglercraftx"; then
+        printf 'Could not restore the previous Eaglercraft checkout; it remains at %s.\n' "$OLD_CHECKOUT" >&2
+        rm -rf "$CLONE_STAGE"
+        exit 1
+      fi
+    fi
+    rm -rf "$CLONE_STAGE"
+    printf 'Could not install the Eaglercraft source checkout. Existing server data was not changed.\n' >&2
+    exit 1
+  fi
+  rm -rf "$OLD_CHECKOUT"
+  rmdir "$CLONE_STAGE"
+  mkdir -p "$SERVER_DIR/eaglercraftx/eaglercraftx"
+  cd "$SERVER_DIR/eaglercraftx/eaglercraftx"
+else
+  cd "$SERVER_DIR/eaglercraftx"
 fi
 if [ -f "client_version" ] && [ -f "gateway_version" ]; then
   if ! cmp -s "../client_version" "client_version"; then
-    rm ../client_version
-    cp client_version ../client_version
-    rm ../buildconf.json
+    for tool in javac wget jq; do
+      if ! command -v "$tool" >/dev/null 2>&1; then
+        printf 'Cannot update the Eaglercraft client: required command "%s" is missing.\n' "$tool" >&2
+        exit 1
+      fi
+    done
+    JAVA11="$(command -v javac)"
+    JAVA11="${JAVA11%?}"
+    rm -f ../buildconf.json
     sed "s#BASEDIR#$BASEDIR#" ../buildconf_template.json > ../buildconf.json
-    if [ ! -f /tmp/mcp918.zip ]; then
-      wget -O /tmp/mcp918.zip http://www.modcoderpack.com/files/mcp918.zip
+    download_cached_file "http://www.modcoderpack.com/files/mcp918.zip" /tmp/mcp918.zip || exit 1
+    download_cached_file "https://launcher.mojang.com/v1/objects/0983f08be6a4e624f5d85689d1aca869ed99c738/client.jar" /tmp/1.8.8.jar || exit 1
+    download_cached_file "https://launchermeta.mojang.com/v1/packages/f6ad102bcaa53b1a58358f16e376d548d44933ec/1.8.json" /tmp/1.8.json || exit 1
+    if ! jar tf /tmp/mcp918.zip >/dev/null 2>&1 || ! jar tf /tmp/1.8.8.jar >/dev/null 2>&1; then
+      if ! jar tf /tmp/mcp918.zip >/dev/null 2>&1; then
+        rm -f /tmp/mcp918.zip
+      fi
+      if ! jar tf /tmp/1.8.8.jar >/dev/null 2>&1; then
+        rm -f /tmp/1.8.8.jar
+      fi
+      printf 'A cached Eaglercraft build archive was invalid and has been removed. Run start again to download it again.\n' >&2
+      exit 1
     fi
-    if [ ! -f /tmp/1.8.8.jar ]; then
-      wget -O /tmp/1.8.8.jar https://launcher.mojang.com/v1/objects/0983f08be6a4e624f5d85689d1aca869ed99c738/client.jar
-    fi
-    if [ ! -f /tmp/1.8.json ]; then
-      wget -O /tmp/1.8.json https://launchermeta.mojang.com/v1/packages/f6ad102bcaa53b1a58358f16e376d548d44933ec/1.8.json
+    if ! jq empty /tmp/1.8.json >/dev/null 2>&1; then
+      rm -f /tmp/1.8.json
+      printf 'The cached Minecraft version manifest was invalid and has been removed. Run start again to download it again.\n' >&2
+      exit 1
     fi
     cd ..
-    tmux new -d -s placeholder "java -Xmx128M PlaceHTTPer 8080 Compiling the latest client.... Please wait!"
+    if command -v tmux >/dev/null 2>&1; then
+      tmux new -d -s placeholder "java -Xmx128M PlaceHTTPer 8080 Compiling the latest client.... Please wait!"
+    fi
     cd eaglercraftx
     "$JAVA11" -Xmx512M -cp "buildtools/BuildTools.jar" net.lax1dude.eaglercraft.v1_8.buildtools.gui.headless.CompileLatestClientHeadless -y ../buildconf.json
     retVal=$?
-    tmux kill-session -t placeholder
+    if command -v tmux >/dev/null 2>&1; then
+      tmux kill-session -t placeholder 2>/dev/null || true
+    fi
+    if [ "$retVal" -ne 0 ]; then
+      printf 'Eaglercraft client build failed (exit %s); server startup was cancelled. Run start again to retry.\n' "$retVal" >&2
+      exit "$retVal"
+    fi
+    if [ ! -d /tmp/output ] || [ -z "$(find /tmp/output -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+      printf 'Eaglercraft client build produced no files; server startup was cancelled. Run start again to retry.\n' >&2
+      exit 1
+    fi
+    if ! cp -r /tmp/output/. ../web/; then
+      printf 'Could not install the built Eaglercraft client into web/; server startup was cancelled.\n' >&2
+      exit 1
+    fi
+    if ! cp client_version ../client_version; then
+      printf 'Could not record the built Eaglercraft client version; server startup was cancelled.\n' >&2
+      exit 1
+    fi
     rm -rf /tmp/##EAGLER.TEMP##
     rm -rf /tmp/teavm
-    if [ $retVal -eq 0 ]; then
-      cp -r /tmp/output/* ../web/
-    fi
     rm -rf /tmp/output
   fi
   if ! cmp -s "../gateway_version" "gateway_version"; then
-    rm ../gateway_version
-    cp gateway_version ../gateway_version
-    if [ -f "gateway/EaglercraftXBungee/EaglerXBungee-Latest.jar" ]; then
-      rm ../bungee/plugins/EaglercraftXBungee.jar
-      cp gateway/EaglercraftXBungee/EaglerXBungee-Latest.jar ../bungee/plugins/EaglercraftXBungee.jar
+    gateway_jar="gateway/EaglercraftXBungee/EaglerXBungee-Latest.jar"
+    if [ ! -s "$gateway_jar" ] || ! jar tf "$gateway_jar" >/dev/null 2>&1; then
+      printf 'Eaglercraft gateway version changed but its plugin jar is missing or invalid; server startup was cancelled.\n' >&2
+      exit 1
+    fi
+    if ! cp "$gateway_jar" ../bungee/plugins/EaglercraftXBungee.jar ||
+      ! cp gateway_version ../gateway_version; then
+      printf 'Could not install the Eaglercraft gateway update; server startup was cancelled.\n' >&2
+      exit 1
     fi
   fi
 fi
 
-# update waterfall!!
-cd ../bungee
-rm bungee-new.jar
-WF_VERSION="`curl -s \"https://papermc.io/api/v2/projects/waterfall\" | jq -r \".version_groups[-1]\"`"
-WF_BUILDS="`curl -s \"https://papermc.io/api/v2/projects/waterfall/versions/$WF_VERSION/builds\"`"
-WF_SHA256="`echo $WF_BUILDS | jq -r \".builds[-1].downloads.application.sha256\"`"
-echo "$WF_SHA256 bungee.jar" | sha256sum --check
-retVal=$?
-if [ $retVal -ne 0 ]; then
-  wget -O bungee-new.jar "`echo $WF_BUILDS | jq -r \".builds[-1]|\\\"https://papermc.io/api/v2/projects/waterfall/versions/$WF_VERSION/builds/\\\"+(.build|tostring)+\\\"/downloads/\\\"+.downloads.application.name\"`"
-  if [ -f "bungee-new.jar" ]; then
-    rm bungee.jar
-    mv bungee-new.jar bungee.jar
-  fi
-fi
 cd ..
 
 # run it!!
-cd bungee
-tmux new -d -s server "java -Xmx128M -jar bungee.jar; tmux kill-session -t server"
-cd ../server
-if [ ! -f "server.jar" ] && [ -d "../cuberite" ]; then
-  cd ../cuberite
-  tmux splitw -t server -v "BIND_ADDR=127.0.0.1 LD_PRELOAD=../bindmod.so ./Cuberite; tmux kill-session -t server"
-else
-  tmux splitw -t server -v "java -Djline.terminal=jline.UnsupportedTerminal -Xmx512M -jar server.jar nogui; tmux kill-session -t server"
+if ! jar tf bungee/bungee.jar >/dev/null 2>&1; then
+  printf 'Cannot start: bungee/bungee.jar is missing or invalid. Restore the Velocity jar before retrying.\n' >&2
+  exit 1
 fi
-cd ..
-while tmux has-session -t server
-do
-  tmux a -t server
-done
+
+if [ -f "server/server.jar" ]; then
+  if ! jar tf server/server.jar >/dev/null 2>&1; then
+    printf 'Cannot start: server/server.jar is invalid. Restore the backend jar before retrying.\n' >&2
+    exit 1
+  fi
+elif [ ! -x "cuberite/Cuberite" ]; then
+  printf 'Cannot start: server/server.jar and executable cuberite/Cuberite are both missing.\n' >&2
+  exit 1
+fi
+
+if command -v tmux >/dev/null 2>&1; then
+  cd bungee
+  tmux new -d -s server "java -Xmx128M -jar bungee.jar; tmux kill-session -t server"
+  cd ../server
+  if [ ! -f "server.jar" ] && [ -d "../cuberite" ]; then
+    cd ../cuberite
+    tmux splitw -t server -v "BIND_ADDR=127.0.0.1 LD_PRELOAD=../bindmod.so ./Cuberite; tmux kill-session -t server"
+  else
+    tmux splitw -t server -v "java -Djline.terminal=jline.UnsupportedTerminal -Xmx512M -jar server.jar nogui; tmux kill-session -t server"
+  fi
+  cd ..
+else
+  (cd bungee && exec java -Xmx128M -jar bungee.jar) &
+  PROXY_PID=$!
+  if [ ! -f "server/server.jar" ] && [ -d "cuberite" ]; then
+    (cd cuberite && exec env BIND_ADDR=127.0.0.1 LD_PRELOAD=../bindmod.so ./Cuberite) &
+  else
+    (cd server && exec java -Djline.terminal=jline.UnsupportedTerminal -Xmx512M -jar server.jar nogui) &
+  fi
+  BACKEND_PID=$!
+  cleanup_server_processes() {
+    trap - INT TERM EXIT
+    kill "$BACKEND_PID" "$PROXY_PID" 2>/dev/null || true
+    wait "$BACKEND_PID" "$PROXY_PID" 2>/dev/null || true
+  }
+  trap cleanup_server_processes EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+fi
+
+ensure_codespaces_port_public
+
+if command -v tmux >/dev/null 2>&1; then
+  while tmux has-session -t server
+  do
+    tmux a -t server
+  done
+  printf 'The server tmux session has stopped.\n' >&2
+  exit 1
+else
+  wait -n "$PROXY_PID" "$BACKEND_PID"
+  SERVER_EXIT=$?
+  if [ "$SERVER_EXIT" -eq 0 ]; then
+    SERVER_EXIT=1
+  fi
+  printf 'A server process stopped (exit %s).\n' "$SERVER_EXIT" >&2
+  exit "$SERVER_EXIT"
+fi
 
 echo 'you might need to agree to the EULA in the server folder'

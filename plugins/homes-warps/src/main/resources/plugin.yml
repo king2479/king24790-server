@@ -1,0 +1,23 @@
+name: HomesWarps
+main: net.king24790.homeswarps.HomesWarpsPlugin
+version: 1.0.0
+description: Personal homes and operator-managed public warps.
+commands:
+  sethome:
+    description: Set your personal home.
+    usage: /sethome
+  home:
+    description: Teleport to your personal home.
+    usage: /home
+  setwarp:
+    description: Create or update a public warp.
+    usage: /setwarp <name>
+  warp:
+    description: Teleport to a public warp.
+    usage: /warp [name]
+  warps:
+    description: List public warps.
+    usage: /warps
+  delwarp:
+    description: Delete a public warp.
+    usage: /delwarp <name>

@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+SERVER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source "$SERVER_DIR/codespaces-port.sh"
+
+for tool in java git jar; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    printf 'Cannot start: required command "%s" is missing.\n' "$tool" >&2
+    exit 1
+  fi
+done
+
+if [[ ! -f "$SERVER_DIR/main.sh" ]]; then
+  printf 'Cannot start: main.sh was not found in %s.\n' "$SERVER_DIR" >&2
+  exit 1
+fi
+
+if command -v tmux >/dev/null 2>&1 && tmux has-session -t server 2>/dev/null; then
+  ensure_codespaces_port_public
+  exec tmux attach-session -t server
+fi
+
+if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | awk '$4 ~ /:8081$/ { found = 1 } END { exit !found }'; then
+  printf 'The server is already listening on port 8081 outside tmux; refusing to start a duplicate.\n'
+  exit 0
+fi
+
+cd "$SERVER_DIR"
+exec bash ./main.sh

@@ -17,7 +17,6 @@ settings:
   sleep-between-chunk-saves: false
   region-file-cache-size: 256
   save-empty-scoreboard-teams: false
-  play-in-use-item-spam-threshold: 300
   incoming-packet-spam-threshold: 300
   remove-invalid-statistics: false
   save-player-data: true
@@ -36,9 +35,9 @@ settings:
   enable-player-collisions: true
   player-auto-save-rate: -1
   max-player-auto-save-per-tick: -1
+  play-in-use-item-spam-threshold: 300
   baby-zombie-movement-speed: 0.5
   limit-player-interactions: true
-remove-invalid-statistics: false
 messages:
   kick:
     authentication-servers-down: ''
@@ -46,7 +45,7 @@ messages:
     flying-vehicle: Flying is not enabled on this server
 timings:
   enabled: true
-  verbose: true
+  verbose: false
   server-name-privacy: false
   hidden-config-entries:
   - database
@@ -126,10 +125,8 @@ world-settings:
       push-based: false
     duplicate-uuid-resolver: saferegen
     duplicate-uuid-saferegen-delete-range: 32
-    fire-physics-event-for-redstone: false
     keep-spawn-loaded-range: 4
     auto-save-interval: -1
-    grass-spread-tick-rate: 1
     nether-ceiling-void-damage: false
     allow-non-player-entities-on-scoreboards: false
     container-update-tick-rate: 1
@@ -141,11 +138,14 @@ world-settings:
     parrots-are-unaffected-by-player-movement: false
     disable-explosion-knockback: false
     elytra-hit-wall-damage: true
+    grass-spread-tick-rate: 1
     use-alternate-fallingblock-onGround-detection: false
     bed-search-radius: 1
     non-player-arrow-despawn-rate: -1
-    enable-old-tnt-cannon-behaviors: false
     prevent-tnt-from-moving-in-water: false
+    spawner-nerfed-mobs-should-jump: false
+    baby-zombie-movement-speed: 0.5
+    allow-leashing-undead-horse: false
     armor-stands-tick: true
     keep-spawn-loaded: true
     anti-xray:
@@ -177,17 +177,16 @@ world-settings:
     disable-thunder: false
     skeleton-horse-thunder-spawn-chance: 0.01
     disable-ice-and-snow: false
-    baby-zombie-movement-speed: 0.5
-    spawner-nerfed-mobs-should-jump: false
-    allow-leashing-undead-horse: false
-    mob-spawner-tick-rate: 1
+    fire-physics-event-for-redstone: false
     all-chunks-are-slime-chunks: false
+    mob-spawner-tick-rate: 1
     squid-spawn-height:
       maximum: 63.0
       minimum: 45.0
     disable-teleportation-suffocation-check: false
     enable-treasure-maps: true
     treasure-maps-return-already-discovered: false
+    enable-old-tnt-cannon-behaviors: false
     verbose: true
     allow-block-location-tab-completion: true
     load-chunks:
@@ -213,6 +212,7 @@ world-settings:
     use-async-lighting: false
     tick-next-tick-list-cap: 10000
     tick-next-tick-list-cap-ignores-redstone: false
+remove-invalid-statistics: false
 data-value-allowed-items: []
 effect-modifiers:
   strength: 1.3
